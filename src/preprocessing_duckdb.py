@@ -1,23 +1,33 @@
 import duckdb as ddb
 
+# schema resultat:
+# RESULTATX - ID der messung - EGAL
+# ANALYTX - messungsart
+# ERGEBNISF wert
+# AUFTRAGX auftragsid
+# ERFASSDAT timestamp
+#
+# schema auftrag
+# AUFTRAGX - auftragsid
+# PATISTAMMX - patientid
+
+
 auftrag_path = "./data/Auftrag_01_24-07_25.csv"
 resultat_path = "./data/Resultat_01_24-07_25.csv"
 
 resultat = ddb.read_csv(resultat_path, delimiter=";")
 auftrag = ddb.read_csv(auftrag_path, delimiter=";")
 
-sql = """
-      SELECT
-          ANALYTX,
-          COUNT(*) AS cnt
+preprocessing_auftrag = """
+WITH  as (SELECT
+          ANALYTX as analyt,
+          ERGEBNISF as messwert,
+          AUFTRAGX as auftragsid,
+          ERFASSDAT as messtimestamp
       FROM r
-      GROUP BY ANALYTX
-      ORDER BY cnt DESC;
+      WHERE ERGEBNISF IS NOT NULL)
       """
+preprocessed_auftrag = resultat.query("r", preprocessing_auftrag)
 
-#  "r" is the name we expose inside the SQL string
-summary_df = resultat.query("r", sql).df()
 
-# Export summary DataFrame to CSV
-summary_path = "./data/summary_df.csv"
-summary_df.to_csv(summary_path, index=False)
+preprocessed_auftrag.to_csv("./data/preprocessed_auftrag.csv")
