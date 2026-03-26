@@ -12,11 +12,12 @@ import duckdb as ddb
 # PATISTAMMX - patientid
 
 
+# Paths to the CSV files containing the raw data
 auftrag_path = "./data/Auftrag_01_24-07_25.csv"
 resultat_path = "./data/Resultat_01_24-07_25.csv"
 
-resultat = ddb.read_csv(resultat_path, delimiter=";")
-auftrag = ddb.read_csv(auftrag_path, delimiter=";")
+ddb.sql(f"CREATE OR REPLACE TABLE resultat AS SELECT * FROM read_csv_auto('{resultat_path}', delim=';')")
+ddb.sql(f"CREATE OR REPLACE TABLE auftrag AS SELECT * FROM read_csv_auto('{auftrag_path}', delim=';')")
 
 preprocessing_auftrag = """
 WITH ergebnisse_mit_werten AS (
@@ -26,7 +27,7 @@ WITH ergebnisse_mit_werten AS (
         AUFTRAGX as auftragsid,
         ERFASSDAT as messtimestamp,
         ROW_NUMBER() OVER (PARTITION BY auftragsid, analyt ORDER BY ERFASSDAT DESC) as rn
-    FROM r
+    FROM resultat
     WHERE ERGEBNISF IS NOT NULL
 ),
 plausible_auftraege as (
@@ -34,17 +35,18 @@ plausible_auftraege as (
     where maxsubq.maxrn < 100
     group by maxsubq.auftragsid
 )    
--- here, I want to not include and 
-SELECT analyt, 
-       messwert, 
-       ergebnisse_mit_werten.auftragsid, 
-       messtimestamp 
+SELECT analyt,
+       messwert,
+       ergebnisse_mit_werten.auftragsid,
+       messtimestamp
 FROM ergebnisse_mit_werten
 inner join plausible_auftraege on
     plausible_auftraege.auftragsid = ergebnisse_mit_werten.auftragsid
+inner join (select distinct AUFTRAGX from auftrag) auftrag_distinct on
+    auftrag_distinct.AUFTRAGX = ergebnisse_mit_werten.auftragsid
 WHERE rn = 1
 """
-preprocessed_auftrag = resultat.query("r", preprocessing_auftrag)
-# preprocessed_auftrag.to_csv("./data/preprocessed_auftrag.csv")
+preprocessed_auftrag = ddb.sql(preprocessing_auftrag)
+preprocessed_auftrag.to_csv("./data/preprocessed_auftrag.csv")
 
 print(preprocessed_auftrag.df())
