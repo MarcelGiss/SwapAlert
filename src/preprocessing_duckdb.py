@@ -46,6 +46,7 @@ inner join plausible_auftraege on
 inner join (select distinct AUFTRAGX, PATISTAMMX from auftrag) auftrag_distinct on
     auftrag_distinct.AUFTRAGX = ergebnisse_mit_werten.auftragsid
 WHERE rn = 1
+and analyt not in (11958, 11959, 11960)
 """
 ddb.sql(f"CREATE OR REPLACE VIEW resultat_filtered AS {filtering_auftrag}")
 
