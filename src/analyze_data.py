@@ -105,3 +105,19 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+# Metric: Orders Per Patient
+# mean      6.881574
+# min       1.000000
+# max     843.000000
+# std      16.731350
+# Metric: Timestamps Per Order
+# mean     25.365218
+# min       1.000000
+# max     122.000000
+# std      20.112605
+# Metric: Analyt Per Order
+# mean     25.365218
+# min       1.000000
+# max     122.000000
+# std      20.112605
