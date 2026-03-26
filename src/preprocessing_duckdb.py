@@ -19,15 +19,19 @@ resultat = ddb.read_csv(resultat_path, delimiter=";")
 auftrag = ddb.read_csv(auftrag_path, delimiter=";")
 
 preprocessing_auftrag = """
-WITH  as (SELECT
-          ANALYTX as analyt,
-          ERGEBNISF as messwert,
-          AUFTRAGX as auftragsid,
-          ERFASSDAT as messtimestamp
-      FROM r
-      WHERE ERGEBNISF IS NOT NULL)
-      """
+WITH ergebnisse_mit_werten AS (
+    SELECT
+        ANALYTX as analyt,
+        ERGEBNISF as messwert,
+        AUFTRAGX as auftragsid,
+        ERFASSDAT as messtimestamp,
+        ROW_NUMBER() OVER (PARTITION BY auftragsid, analyt ORDER BY ERFASSDAT DESC) as rn
+    FROM r
+    WHERE ERGEBNISF IS NOT NULL
+)
+SELECT analyt, messwert, auftragsid, messtimestamp 
+FROM ergebnisse_mit_werten
+WHERE rn = 1
+"""
 preprocessed_auftrag = resultat.query("r", preprocessing_auftrag)
-
-
 preprocessed_auftrag.to_csv("./data/preprocessed_auftrag.csv")
