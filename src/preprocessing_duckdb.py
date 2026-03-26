@@ -65,7 +65,7 @@ cutoff_analyt = """
 select * from resultat_filtered
     left join analyt_counts
     on analyt_counts.analyt = resultat_filtered.analyt
-    where analyt_counts.cnt < 10000
+    where analyt_counts.cnt > 10000
 """
 preprocessed_auftrag = ddb.sql(cutoff_analyt)
 
