@@ -62,7 +62,13 @@ ddb.sql(f"CREATE OR REPLACE VIEW analyt_counts AS {analyze_analyt_count_query}")
 analyt_analyse.to_csv("./data/analyt_analyse.csv")
 
 cutoff_analyt = """
-select * from resultat_filtered
+select 
+    resultat_filtered.analyt,
+    resultat_filtered.messwert,
+    resultat_filtered.auftragsid,
+    resultat_filtered.patientid,
+    resultat_filtered.messtimestamp
+from resultat_filtered
     left join analyt_counts
     on analyt_counts.analyt = resultat_filtered.analyt
     where analyt_counts.cnt > 10000
