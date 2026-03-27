@@ -3,7 +3,7 @@ import numpy as np
 
 
 class DataLoader:
-    def __init__(self, path: str, history_length: int = 20, n_rows: int | None = None):
+    def __init__(self, path: str, history_length: int = 20, n_rows: int | None = None, required_auftraege_per_patient=5):
         """Create a DataLoader.
 
         Parameters
@@ -21,8 +21,16 @@ class DataLoader:
             self.data = pd.read_csv(path, nrows=n_rows)
         else:
             self.data = pd.read_csv(path)
+        # Disregard all patients with less than 5 unique aufträge (orders).
+        if "patientid" in self.data.columns and "auftragsid" in self.data.columns:
+            # Count unique auftrags per patient
+            patient_auftrag_counts = (
+                self.data.groupby("patientid")["auftragsid"].nunique()
+            )
+            valid_patients = patient_auftrag_counts[patient_auftrag_counts >= required_auftraege_per_patient].index
+            self.data = self.data[self.data["patientid"].isin(valid_patients)]
+        # Determine the set of all analytes after filtering patients.
         self.all_analyte = self.data["analyt"].unique()
-        self.history_length = history_length
         self.history_length = history_length
 
     def get_sample(self, add_synthetic_swap: bool = False):
@@ -117,7 +125,7 @@ if __name__ == "__main__":
     # Load the sample CSV provided in the repository and retrieve a sample
     # without and with synthetic swap to verify basic functionality.
     csv_path = "./data/preprocessed_auftrag.csv"
-    loader = DataLoader(csv_path, n_rows = 100)
+    loader = DataLoader(csv_path)
     print("--- Sample without synthetic swap ---")
     sample = loader.get_sample()
     print(sample)
