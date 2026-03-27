@@ -136,7 +136,7 @@ def _run_training(args: argparse.Namespace) -> None:
         # larger datasets. The ``verbose`` flag is tied to the CLI ``--verbose``
         # argument so users can enable per‑iteration progress information.
         clf = LogisticRegression(
-            max_iter=200,
+            max_iter=10,
             C=1.0,
             solver="saga",
             n_jobs=-1,
