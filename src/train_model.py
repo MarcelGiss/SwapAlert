@@ -127,11 +127,11 @@ def _run_training(args: argparse.Namespace) -> None:
         # tree depth to reduce over‑fitting, and add L2 regularisation.
         from sklearn.ensemble import HistGradientBoostingClassifier
         clf = HistGradientBoostingClassifier(
-            max_iter=800,                # allow more boosting rounds
-            learning_rate=0.1,           # higher LR for faster convergence
-            max_depth=5,                 # shallow trees to improve generalisation
+            max_iter=1000,
+            learning_rate=0.05,
+            max_depth=8,
             early_stopping=True,
-            l2_regularization=0.1,      # mild regularisation to curb over‑fit
+            l2_regularization=0,
             random_state=42,
             verbose=args.verbose,
         )
