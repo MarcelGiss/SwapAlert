@@ -46,7 +46,8 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
 # Local imports
-from src.data_loader import DataLoader
+# Adjust import for package execution context
+from data_loader import DataLoader
 
 
 def _flatten_sample(df: pd.DataFrame) -> np.ndarray:
@@ -78,33 +79,45 @@ def _generate_dataset(
     n_swap = int(n_samples * swap_ratio)
     n_clean = n_samples - n_swap
 
-    X: list[np.ndarray] = []
-    y: list[int] = []
+    # Helper to generate a single sample and label.
+    def _gen_one(swap: bool) -> Tuple[np.ndarray, int]:
+        sample = loader.get_sample(add_synthetic_swap=swap)
+        return _flatten_sample(sample), int(swap)
+
+    # Use joblib for simple parallelism if many samples are requested.
+    from joblib import Parallel, delayed
 
     total = n_samples
     generated = 0
-    def _log_progress():
-        # Simple progress output showing percentage completed.
+    def _log_progress(step: int = 1):
+        nonlocal generated
+        generated += step
         percent = (generated / total) * 100
         print(f"\rGenerating samples: {generated}/{total} ({percent:.1f}%)", end="", flush=True)
 
-    # Generate clean samples
+    # Generate clean and swapped samples in parallel batches.
+    # Determine number of workers (use all cores but limit to avoid oversubscription).
+    import os
+    n_jobs = max(1, os.cpu_count() - 1)
+
+    # Clean samples
+    clean_results = Parallel(n_jobs=n_jobs, backend="threading")(
+        delayed(_gen_one)(False) for _ in range(n_clean)
+    )
     for _ in range(n_clean):
-        sample = loader.get_sample(add_synthetic_swap=False)
-        X.append(_flatten_sample(sample))
-        y.append(0)
-        generated += 1
         _log_progress()
 
-    # Generate swapped samples
+    # Swapped samples
+    swap_results = Parallel(n_jobs=n_jobs, backend="threading")(
+        delayed(_gen_one)(True) for _ in range(n_swap)
+    )
     for _ in range(n_swap):
-        sample = loader.get_sample(add_synthetic_swap=True)
-        X.append(_flatten_sample(sample))
-        y.append(1)
-        generated += 1
         _log_progress()
 
     print()  # newline after progress bar
+    # Combine results
+    X = [feat for feat, _ in clean_results] + [feat for feat, _ in swap_results]
+    y = [label for _, label in clean_results] + [label for _, label in swap_results]
     return np.stack(X, axis=0), np.array(y, dtype=int)
 
 
@@ -139,6 +152,12 @@ def main() -> None:
         type=int,
         default=5,
         help="Minimum number of distinct orders a patient must have to be included",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help="Number of parallel workers for dataset generation (default: all CPU cores - 1)",
     )
     args = parser.parse_args()
 
