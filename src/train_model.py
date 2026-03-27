@@ -179,8 +179,8 @@ def _run_training(args: argparse.Namespace) -> None:
     # omit the SimpleImputer step for that specific model. All other models
     # retain the original imputation + scaling pipeline.
     steps = []
-    if args.model_type != "hist_gradient_boosting":
-        steps.append(("imputer", SimpleImputer(strategy="median")))
+    # if args.model_type != "hist_gradient_boosting":
+    steps.append(("imputer", SimpleImputer(strategy="median")))
     # Scaling is generally beneficial for many models and does not interfere
     # with HistGradientBoostingClassifier, so we keep it for all cases.
     steps.append(("scaler", StandardScaler()))

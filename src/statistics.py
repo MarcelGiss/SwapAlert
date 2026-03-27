@@ -3,7 +3,7 @@ import pandas as pd
 pd.set_option("display.max_columns", None)
 pd.set_option("display.width", None)
 pd.set_option("display.max_colwidth", None)
-preprocessed_auftrag = "./data/basis_marcel.csv"
+preprocessed_auftrag = "./data/basis2_marcel.csv"
 
 preprocessed_auftrag = ddb.read_csv(preprocessed_auftrag, delimiter=",")
 preview_df = preprocessed_auftrag.query("r", "SELECT * FROM r LIMIT 5").df()
@@ -13,8 +13,13 @@ print(preview_df)
 #hier noch hinzufügen bei select varianz von messwert
 sql = """
       Select * from r
-      where patientid = 1302000
+      where patientid = 1707000
       """
+
+sqlGetAuftrag = """
+                Select * from r
+                where auftragsid = 14220810 \
+                """
 
 ## change person id 1707000 for auftragsid 14220810
 sqlChangePerson = """
@@ -184,9 +189,9 @@ sql_score_per_auftrag = """
 sql_analyt_anaylse = sql_analyt_analyse
 
 
-analysis_results = preprocessed_auftrag.query("r", sql).df()
+analysis_results = preprocessed_auftrag.query("r", sql_score_per_auftrag).df()
 print(analysis_results)
 print(analysis_results.head())
 #print(analysis_results.to_string(index=False))
 
-analysis_results.to_csv("./data/basis_reduced_marcel.csv", index=False)
+analysis_results.to_csv("./data/basis2_end_marcel.csv", index=False)
