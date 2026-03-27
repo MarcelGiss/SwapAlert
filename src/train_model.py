@@ -48,7 +48,6 @@ from sklearn.preprocessing import StandardScaler
 # Local imports
 from data_loader import DataLoader
 
-
 def _flatten_sample(df: pd.DataFrame) -> np.ndarray:
     """Flatten a ``DataLoader`` sample to a 1‑D ``numpy`` array.
 
@@ -59,65 +58,6 @@ def _flatten_sample(df: pd.DataFrame) -> np.ndarray:
     return df.values.ravel()
 
 
-def _generate_dataset(
-    loader: DataLoader,
-    n_samples: int,
-    swap_ratio: float = 0.5,
-) -> Tuple[np.ndarray, np.ndarray]:
-    """Generate feature matrix ``X`` and label vector ``y`` with console progress.
-
-    Parameters
-    ----------
-    loader:
-        Instance of :class:`DataLoader` pointing to the pre‑processed CSV.
-    n_samples:
-        Total number of samples to generate.
-    swap_ratio:
-        Fraction of samples that contain a synthetic swap (label ``1``).
-    """
-    n_swap = int(n_samples * swap_ratio)
-    n_clean = n_samples - n_swap
-
-    # Helper to generate a single sample and label.
-    def _gen_one(swap: bool) -> Tuple[np.ndarray, int]:
-        sample = loader.get_sample(add_synthetic_swap=swap)
-        return _flatten_sample(sample), int(swap)
-
-    # Use joblib for simple parallelism if many samples are requested.
-    from joblib import Parallel, delayed
-
-    total = n_samples
-    generated = 0
-    def _log_progress(step: int = 1):
-        nonlocal generated
-        generated += step
-        percent = (generated / total) * 100
-        print(f"\rGenerating samples: {generated}/{total} ({percent:.1f}%)", end="", flush=True)
-
-    # Generate clean and swapped samples in parallel batches.
-    # Determine number of workers (use all cores but limit to avoid oversubscription).
-    import os
-    n_jobs = max(1, os.cpu_count() - 1)
-
-    # Clean samples
-    clean_results = Parallel(n_jobs=n_jobs, backend="threading")(
-        delayed(_gen_one)(False) for _ in range(n_clean)
-    )
-    for _ in range(n_clean):
-        _log_progress()
-
-    # Swapped samples
-    swap_results = Parallel(n_jobs=n_jobs, backend="threading")(
-        delayed(_gen_one)(True) for _ in range(n_swap)
-    )
-    for _ in range(n_swap):
-        _log_progress()
-
-    print()  # newline after progress bar
-    # Combine results
-    X = [feat for feat, _ in clean_results] + [feat for feat, _ in swap_results]
-    y = [label for _, label in clean_results] + [label for _, label in swap_results]
-    return np.stack(X, axis=0), np.array(y, dtype=int)
 
 
 from typing import Optional
@@ -140,20 +80,16 @@ def _run_training(loader: Optional[DataLoader], args: argparse.Namespace) -> Non
         loaded = np.load(test_dataset_path)
         X, y = loaded["X"], loaded["y"]
     else:
-        # If no cached dataset exists we must generate it. Ensure we have a DataLoader.
-        if loader is None:
-            raise RuntimeError(
-                "DataLoader is required to generate a new dataset but none was provided."
-            )
-        print("Generating dataset …")
-        X, y = _generate_dataset(loader, n_samples=args.samples, swap_ratio=0.5)
-        # Save for fast subsequent runs
-        print(f"Saving generated dataset to {test_dataset_path}")
-        np.savez_compressed(test_dataset_path, X=X, y=y)
+        raise ValueError("No train dataset found")
 
     # Split into train / test.
+    # Determine a safe test split size.  For very small synthetic datasets the
+    # default 20 % split can result in a test set with fewer than two classes,
+    # causing ``train_test_split`` to raise a ValueError.  We fallback to a 50 %
+    # split when the total number of samples is less than 5.
+    split_ratio = 0.2 if X.shape[0] >= 5 else 0.5
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
+        X, y, test_size=split_ratio, random_state=42, stratify=y
     )
 
     # Build a scikit‑learn pipeline.
@@ -196,28 +132,10 @@ def main() -> None:
         help="Path to the pre‑processed CSV file",
     )
     parser.add_argument(
-        "--samples",
-        type=int,
-        default=5000,
-        help="Number of training samples to generate",
-    )
-    parser.add_argument(
-        "--history-length",
-        type=int,
-        default=5,
-        help="History length used by DataLoader",
-    )
-    parser.add_argument(
-        "--test-dataset-path",
+        "--train-dataset-path",
         type=str,
-        default="../data/test_dataset.npz",
+        default="../data/train_dataset_len50k_h20_min5.npz",
         help="Path where the generated test dataset is cached",
-    )
-    parser.add_argument(
-        "--required-auftraege-per-patient",
-        type=int,
-        default=5,
-        help="Minimum number of distinct orders a patient must have to be included",
     )
     parser.add_argument(
         "--workers",
@@ -228,9 +146,9 @@ def main() -> None:
     args = parser.parse_args()
 
     data_path = pathlib.Path(args.data)
-    test_dataset_path = pathlib.Path(args.test_dataset_path)
+    train_dataset_path = pathlib.Path(args.train_dataset_path)
 
-    if test_dataset_path.is_file():
+    if train_dataset_path.is_file():
         print(
             "Cached dataset detected; skipping CSV load. "
             "If you need to regenerate the dataset, delete the test dataset file."
@@ -239,11 +157,8 @@ def main() -> None:
     else:
         if not data_path.is_file():
             sys.exit(f"Data file not found: {data_path}")
-        loader = DataLoader(
-            path=str(data_path),
-            history_length=args.history_length,
-            required_auftraege_per_patient=args.required_auftraege_per_patient,
-        )
+    # Use default DataLoader parameters for history length and required orders per patient.
+    loader = DataLoader(path=str(data_path))
 
     # Delegate the remaining workflow to the dedicated helper.
     _run_training(loader, args)
