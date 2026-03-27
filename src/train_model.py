@@ -129,9 +129,9 @@ def _run_training(args: argparse.Namespace) -> None:
         clf = HistGradientBoostingClassifier(
             max_iter=500,
             learning_rate=0.05,
-            max_depth=5,
+            max_depth=None,
             early_stopping=True,
-            l2_regularization=0,
+            l2_regularization=0.0,
             random_state=42,
             verbose=args.verbose,
         )
@@ -240,7 +240,7 @@ def main() -> None:
     parser.add_argument(
         "--model-type",
         type=str,
-        default="logistic_regression",
+        default="hist_gradient_boosting",
         choices=[
             "random_forest",
             "gradient_boosting",
