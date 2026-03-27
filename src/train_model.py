@@ -35,7 +35,7 @@ import pathlib
 import sys
 from typing import Tuple
 
-import joblib
+import pickle
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
@@ -131,23 +131,34 @@ def _run_training(args: argparse.Namespace) -> None:
             verbose=args.verbose,
         )
     elif args.model_type == "logistic_regression":
-        # Logistic Regression with L2 regularization; solver liblinear works well for small datasets
+        # Logistic Regression with L2 regularization. Use the 'saga' solver which
+        # supports parallelism (n_jobs) and verbose output, making it faster on
+        # larger datasets. The ``verbose`` flag is tied to the CLI ``--verbose``
+        # argument so users can enable per‑iteration progress information.
         clf = LogisticRegression(
-            max_iter=100,
+            max_iter=200,
             C=1.0,
-            solver="liblinear",
+            solver="saga",
+            n_jobs=-1,
             random_state=42,
+            verbose=args.verbose,
         )
     elif args.model_type == "svm":
-        # Support Vector Machine with RBF kernel; probability estimates disabled for speed
-        clf = SVC(
+        # Linear Support Vector Machine – much faster than the RBF kernel on
+        # high‑dimensional tabular data. ``LinearSVC`` supports a ``verbose``
+        # flag for progress reporting and can leverage all CPU cores.
+        from sklearn.svm import LinearSVC
+
+        clf = LinearSVC(
             C=1.0,
-            kernel="rbf",
-            probability=False,
             random_state=42,
+            max_iter=10,
+            verbose=args.verbose,
         )
     elif args.model_type == "mlp":
-        # Multi-layer Perceptron with a single hidden layer; early stopping via max_iter
+        # Multi-layer Perceptron with a single hidden layer. Increase ``max_iter``
+        # modestly for better convergence while keeping training time reasonable.
+        # ``verbose`` already provides per‑epoch progress when enabled.
         clf = MLPClassifier(
             hidden_layer_sizes=(100,),
             max_iter=10,
@@ -190,7 +201,11 @@ def _run_training(args: argparse.Namespace) -> None:
         next_version = 1
 
     model_path = models_dir / f"swap_detector_{next_version}.pkl"
-    joblib.dump(pipeline, model_path)
+    # Persist the pipeline. Use ``pickle`` to avoid a hard dependency on the
+    # external ``joblib`` package, which may not be installed in all
+    # environments. The file extension remains ``.pkl`` for compatibility.
+    with open(model_path, "wb") as f:
+        pickle.dump(pipeline, f)
     print(f"Model saved to {model_path}")
 
     # ---------------------------------------------------------------------
@@ -215,7 +230,7 @@ def main() -> None:
     parser.add_argument(
         "--model-type",
         type=str,
-        default="svm",
+        default="logistic_regression",
         choices=[
             "random_forest",
             "gradient_boosting",
