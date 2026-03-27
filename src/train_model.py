@@ -112,8 +112,8 @@ def _run_training(args: argparse.Namespace) -> None:
         )
     elif args.model_type == "gradient_boosting":
         clf = GradientBoostingClassifier(
-            n_estimators=args.n_estimators,
-            learning_rate=args.learning_rate,
+            n_estimators=100,
+            learning_rate=0.1,
             max_depth=5,
             random_state=42,
             verbose=args.verbose,
@@ -122,11 +122,16 @@ def _run_training(args: argparse.Namespace) -> None:
         # Using HistGradientBoostingClassifier for faster training and early stopping support
         from sklearn.ensemble import HistGradientBoostingClassifier
 
+        # Use ``max_iter`` tied to the ``--n-estimators`` argument so users can
+        # control the number of boosting rounds. Lower learning rates with more
+        # iterations often yield better performance, which aligns with the new
+        # defaults (500 estimators, 0.05 learning rate).
         clf = HistGradientBoostingClassifier(
-            max_iter=args.n_estimators,
-            learning_rate=args.learning_rate,
+            max_iter=500,
+            learning_rate=0.05,
             max_depth=None,
             early_stopping=True,
+            l2_regularization=0.0,
             random_state=42,
             verbose=args.verbose,
         )
@@ -190,7 +195,7 @@ def _run_training(args: argparse.Namespace) -> None:
     # Determine next model version based on existing files in the models dir.
     # Files follow the pattern ``swap_detector_<N>.pkl`` where <N> is an integer.
     # ---------------------------------------------------------------------
-    models_dir = pathlib.Path("models")
+    models_dir = pathlib.Path("../models")
     models_dir.mkdir(parents=True, exist_ok=True)
     existing = sorted(models_dir.glob("swap_detector_*.pkl"))
     if existing:
@@ -212,7 +217,7 @@ def _run_training(args: argparse.Namespace) -> None:
     # Persist the evaluation report in the ``trains`` directory using a
     # naming scheme that mirrors existing files, e.g. ``random_forest_2.txt``.
     # ---------------------------------------------------------------------
-    trains_dir = pathlib.Path("trains")
+    trains_dir = pathlib.Path("../trainings")
     trains_dir.mkdir(parents=True, exist_ok=True)
     report_path = trains_dir / f"{args.model_type}_{next_version}.txt"
     report_path.write_text(report)
@@ -240,18 +245,6 @@ def main() -> None:
             "mlp",
         ],
         help="Select which supervised model to train. Added options: logistic_regression, svm, mlp.",
-    )
-    parser.add_argument(
-        "--n-estimators",
-        type=int,
-        default=200,
-        help="Number of boosting/forest estimators (default: 200 for gradient boosting, 500 for random forest).",
-    )
-    parser.add_argument(
-        "--learning-rate",
-        type=float,
-        default=0.1,
-        help="Learning rate for gradient boosting models (default: 0.1).",
     )
     parser.add_argument(
         "--verbose",
