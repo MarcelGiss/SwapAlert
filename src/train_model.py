@@ -171,13 +171,18 @@ def _run_training(args: argparse.Namespace) -> None:
         raise ValueError(f"Unsupported model type: {args.model_type}")
 
     # Build a scikit‑learn pipeline using the selected classifier.
-    pipeline = Pipeline(
-        [
-            ("imputer", SimpleImputer(strategy="median")),
-            ("scaler", StandardScaler()),
-            ("clf", clf),
-        ]
-    )
+    # HistGradientBoostingClassifier natively handles missing values, so we
+    # omit the SimpleImputer step for that specific model. All other models
+    # retain the original imputation + scaling pipeline.
+    steps = []
+    if args.model_type != "hist_gradient_boosting":
+        steps.append(("imputer", SimpleImputer(strategy="median")))
+    # Scaling is generally beneficial for many models and does not interfere
+    # with HistGradientBoostingClassifier, so we keep it for all cases.
+    steps.append(("scaler", StandardScaler()))
+    steps.append(("clf", clf))
+
+    pipeline = Pipeline(steps)
 
     print("Training model …")
     pipeline.fit(X_train, y_train)
