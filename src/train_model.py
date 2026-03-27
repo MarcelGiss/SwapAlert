@@ -77,8 +77,13 @@ def _run_training(loader: Optional[DataLoader], args: argparse.Namespace) -> Non
     test_dataset_path = pathlib.Path(args.test_dataset_path)
     if test_dataset_path.is_file():
         print(f"Loading previously generated test dataset from {test_dataset_path}")
-        loaded = np.load(test_dataset_path)
-        X, y = loaded["X"], loaded["y"]
+        import pandas as pd
+
+        df = pd.read_csv(test_dataset_path)
+        if "label" not in df.columns:
+            raise ValueError("CSV dataset must contain a 'label' column")
+        y = df["label"].values
+        X = df.drop(columns=["label"]).values
     else:
         raise ValueError("No train dataset found")
 
@@ -134,8 +139,8 @@ def main() -> None:
     parser.add_argument(
         "--train-dataset-path",
         type=str,
-        default="../data/train_dataset_len50k_h20_min5.npz",
-        help="Path where the generated test dataset is cached",
+        default="../data/train_dataset_len50k_h20_min5.csv",
+        help="Path where the generated test dataset is cached (CSV format)",
     )
     parser.add_argument(
         "--workers",

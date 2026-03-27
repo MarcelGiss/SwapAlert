@@ -69,7 +69,8 @@ def generate_dataset(
     swap_ratio:
         Fraction of samples that contain a synthetic swap (label ``1``).
     save_path:
-        Optional path where the generated arrays are saved using ``np.savez``.
+        Optional path where the generated dataset is saved as a CSV file.
+        The CSV will contain all feature columns and a ``label`` column.
         If provided, the file will be overwritten if it already exists.
     """
     n_swap = int(n_samples * swap_ratio)
@@ -92,8 +93,14 @@ def generate_dataset(
     y_arr = np.array(y, dtype=int)
 
     if save_path is not None:
+        # Ensure parent directory exists.
         save_path.parent.mkdir(parents=True, exist_ok=True)
-        np.savez_compressed(save_path, X=X_arr, y=y_arr)
+        # Save as CSV with a ``label`` column for compatibility with training script.
+        import pandas as pd
+
+        df = pd.DataFrame(X_arr)
+        df["label"] = y_arr
+        df.to_csv(save_path, index=False)
 
     return X_arr, y_arr
 
@@ -136,8 +143,8 @@ def _parse_args() -> argparse.Namespace:
         "--output",
         type=str,
         required=False,
-        default="../data/train_dataset_samp100_hist20_min5.npz",
-        help="File path where the generated dataset will be saved (.npz)",
+        default="../data/train_dataset_samp100_hist20_min5.csv",
+        help="File path where the generated dataset will be saved (CSV format)",
     )
     return parser.parse_args()
 
