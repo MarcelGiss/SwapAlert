@@ -18,13 +18,24 @@ from __future__ import annotations
 import argparse
 import pathlib
 import sys
+import logging
 from typing import Tuple
 
 import numpy as np
-from joblib import Parallel, delayed
+# Parallel generation was replaced with a simple loop to allow a progress bar.
+# from joblib import Parallel, delayed
 
 # Local imports
 from data_loader import DataLoader
+
+# Set up module‑level logger. If the application configures logging elsewhere this
+# call is a no‑op; otherwise it ensures that INFO‑level messages are printed.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
 
 
 def _flatten_sample(df: "pandas.DataFrame") -> np.ndarray:
@@ -60,6 +71,10 @@ def generate_dataset(
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Generate a balanced feature matrix ``X`` and label vector ``y``.
 
+    This implementation provides a tqdm progress bar to monitor the generation
+    process. Logging is performed **before** the heavy work starts and **after**
+    the dataset is optionally saved, but not for each individual sample.
+
     Parameters
     ----------
     loader:
@@ -73,21 +88,31 @@ def generate_dataset(
         The CSV will contain all feature columns and a ``label`` column.
         If provided, the file will be overwritten if it already exists.
     """
+    # Log the intent before heavy computation.
+    logger.info(
+        "Generating %d samples (swap_ratio=%.2f)", n_samples, swap_ratio
+    )
+
     n_swap = int(n_samples * swap_ratio)
     n_clean = n_samples - n_swap
 
-    import os
-    n_jobs = max(1, (os.cpu_count() or 1) - 1)
+    X: list[np.ndarray] = []
+    y: list[int] = []
 
-    clean_results = Parallel(n_jobs=n_jobs, backend="threading")(
-        delayed(_gen_one)(loader, False) for _ in range(n_clean)
-    )
-    swap_results = Parallel(n_jobs=n_jobs, backend="threading")(
-        delayed(_gen_one)(loader, True) for _ in range(n_swap)
-    )
+    # Use tqdm to display a single progress bar for the whole generation.
+    from tqdm import tqdm
 
-    X = [feat for feat, _ in clean_results] + [feat for feat, _ in swap_results]
-    y = [label for _, label in clean_results] + [label for _, label in swap_results]
+    with tqdm(total=n_samples, desc="Generating dataset", unit="sample") as pbar:
+        for _ in range(n_clean):
+            feat, label = _gen_one(loader, False)
+            X.append(feat)
+            y.append(label)
+            pbar.update(1)
+        for _ in range(n_swap):
+            feat, label = _gen_one(loader, True)
+            X.append(feat)
+            y.append(label)
+            pbar.update(1)
 
     X_arr = np.stack(X, axis=0)
     y_arr = np.array(y, dtype=int)
@@ -101,6 +126,7 @@ def generate_dataset(
         df = pd.DataFrame(X_arr)
         df["label"] = y_arr
         df.to_csv(save_path, index=False)
+        logger.info("Dataset saved to %s", save_path)
 
     return X_arr, y_arr
 
