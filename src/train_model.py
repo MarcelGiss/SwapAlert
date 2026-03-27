@@ -38,7 +38,7 @@ from typing import Tuple
 import joblib
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split
@@ -95,23 +95,33 @@ def _run_training(args: argparse.Namespace) -> None:
         X, y, test_size=split_ratio, random_state=42, stratify=y
     )
 
-    # Build a scikit‑learn pipeline.
+    # Choose classifier based on requested model type.
+    if args.model_type == "random_forest":
+        clf = RandomForestClassifier(
+            n_estimators=500,
+            max_depth=20,
+            min_samples_split=2,
+            min_samples_leaf=1,
+            class_weight="balanced",
+            random_state=42,
+            n_jobs=-1,
+        )
+    elif args.model_type == "gradient_boosting":
+        clf = GradientBoostingClassifier(
+            n_estimators=500,
+            learning_rate=0.1,
+            max_depth=5,
+            random_state=42,
+        )
+    else:
+        raise ValueError(f"Unsupported model type: {args.model_type}")
+
+    # Build a scikit‑learn pipeline using the selected classifier.
     pipeline = Pipeline(
         [
             ("imputer", SimpleImputer(strategy="median")),
             ("scaler", StandardScaler()),
-            (
-                "clf",
-                RandomForestClassifier(
-                    n_estimators=500,        # increased number of trees for better stability
-                    max_depth=20,            # limit depth to reduce over‑fitting
-                    min_samples_split=2,
-                    min_samples_leaf=1,
-                    class_weight="balanced",  # handle any class imbalance
-                    random_state=42,
-                    n_jobs=-1,
-                ),
-            ),
+            ("clf", clf),
         ]
     )
 
@@ -136,6 +146,13 @@ def main() -> None:
         type=str,
         default="../data/train_dataset_samp100k_hist20_min5_50swap.csv",
         help="Path where the generated test dataset is cached (CSV format)",
+    )
+    parser.add_argument(
+        "--model-type",
+        type=str,
+        default="gradient_boosting",
+        choices=["random_forest", "gradient_boosting"],
+        help="Select which supervised model to train (default: random_forest)",
     )
     parser.add_argument(
         "--workers",
