@@ -39,6 +39,10 @@ import joblib
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+# Additional supervised learning models
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+from sklearn.neural_network import MLPClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split
@@ -126,6 +130,31 @@ def _run_training(args: argparse.Namespace) -> None:
             random_state=42,
             verbose=args.verbose,
         )
+    elif args.model_type == "logistic_regression":
+        # Logistic Regression with L2 regularization; solver liblinear works well for small datasets
+        clf = LogisticRegression(
+            max_iter=100,
+            C=1.0,
+            solver="liblinear",
+            random_state=42,
+        )
+    elif args.model_type == "svm":
+        # Support Vector Machine with RBF kernel; probability estimates disabled for speed
+        clf = SVC(
+            C=1.0,
+            kernel="rbf",
+            probability=False,
+            random_state=42,
+        )
+    elif args.model_type == "mlp":
+        # Multi-layer Perceptron with a single hidden layer; early stopping via max_iter
+        clf = MLPClassifier(
+            hidden_layer_sizes=(100,),
+            max_iter=10,
+            learning_rate_init=args.learning_rate,
+            random_state=42,
+            verbose=args.verbose,
+        )
     else:
         raise ValueError(f"Unsupported model type: {args.model_type}")
 
@@ -164,8 +193,15 @@ def main() -> None:
         "--model-type",
         type=str,
         default="hist_gradient_boosting",
-        choices=["random_forest", "gradient_boosting", "hist_gradient_boosting"],
-        help="Select which supervised model to train (default: gradient_boosting)",
+        choices=[
+            "random_forest",
+            "gradient_boosting",
+            "hist_gradient_boosting",
+            "logistic_regression",
+            "svm",
+            "mlp",
+        ],
+        help="Select which supervised model to train. Added options: logistic_regression, svm, mlp.",
     )
     parser.add_argument(
         "--n-estimators",

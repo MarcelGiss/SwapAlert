@@ -1,0 +1,17 @@
+Binning 2.569 GB of training data: 8.298 s
+Binning 0.285 GB of validation data: 0.436 s
+Fitting gradient boosted rounds:
+Fit 148 trees in 123.877 s, (4588 total leaves)
+Time spent computing histograms: 95.504s
+Time spent finding best splits:  13.843s
+Time spent applying splits:      2.370s
+Time spent predicting:           0.152s
+Evaluating on test set …
+              precision    recall  f1-score   support
+
+     no_swap       0.60      0.71      0.65     10000
+        swap       0.64      0.52      0.57     10000
+
+    accuracy                           0.61     20000
+   macro avg       0.62      0.61      0.61     20000
+weighted avg       0.62      0.61      0.61     20000
