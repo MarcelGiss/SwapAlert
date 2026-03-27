@@ -103,8 +103,11 @@ def _run_training(args: argparse.Namespace) -> None:
             (
                 "clf",
                 RandomForestClassifier(
-                    n_estimators=200,
-                    max_depth=None,
+                    n_estimators=500,        # increased number of trees for better stability
+                    max_depth=20,            # limit depth to reduce over‑fitting
+                    min_samples_split=2,
+                    min_samples_leaf=1,
+                    class_weight="balanced",  # handle any class imbalance
                     random_state=42,
                     n_jobs=-1,
                 ),
