@@ -102,7 +102,7 @@ def _run_training(args: argparse.Namespace) -> None:
     # Choose classifier based on requested model type.
     if args.model_type == "random_forest":
         clf = RandomForestClassifier(
-            n_estimators=args.n_estimators,
+            n_estimators=200,
             max_depth=20,
             min_samples_split=2,
             min_samples_leaf=1,
@@ -114,18 +114,14 @@ def _run_training(args: argparse.Namespace) -> None:
         clf = GradientBoostingClassifier(
             n_estimators=100,
             learning_rate=0.1,
-            max_depth=5,
+            max_depth=3,
+            subsample=0.8,
             random_state=42,
             verbose=args.verbose,
         )
     elif args.model_type == "hist_gradient_boosting":
         # Using HistGradientBoostingClassifier for faster training and early stopping support
         from sklearn.ensemble import HistGradientBoostingClassifier
-
-        # Use ``max_iter`` tied to the ``--n-estimators`` argument so users can
-        # control the number of boosting rounds. Lower learning rates with more
-        # iterations often yield better performance, which aligns with the new
-        # defaults (500 estimators, 0.05 learning rate).
         clf = HistGradientBoostingClassifier(
             max_iter=500,
             learning_rate=0.05,
@@ -167,7 +163,7 @@ def _run_training(args: argparse.Namespace) -> None:
         clf = MLPClassifier(
             hidden_layer_sizes=(100,),
             max_iter=10,
-            learning_rate_init=args.learning_rate,
+            learning_rate_init=0.1,
             random_state=42,
             verbose=args.verbose,
         )
