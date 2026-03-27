@@ -46,7 +46,6 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
 # Local imports
-# Adjust import for package execution context
 from data_loader import DataLoader
 
 
@@ -121,57 +120,17 @@ def _generate_dataset(
     return np.stack(X, axis=0), np.array(y, dtype=int)
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Train swap detection model")
-    parser.add_argument(
-        "--data",
-        type=str,
-        default="./data/preprocessed_auftrag.csv",
-        help="Path to the pre‑processed CSV file",
-    )
-    parser.add_argument(
-        "--samples",
-        type=int,
-        default=5000,
-        help="Number of training samples to generate",
-    )
-    parser.add_argument(
-        "--history-length",
-        type=int,
-        default=5,
-        help="History length used by DataLoader",
-    )
-    parser.add_argument(
-        "--test-dataset-path",
-        type=str,
-        default="./data/test_dataset.npz",
-        help="Path where the generated test dataset is cached",
-    )
-    parser.add_argument(
-        "--required-auftraege-per-patient",
-        type=int,
-        default=5,
-        help="Minimum number of distinct orders a patient must have to be included",
-    )
-    parser.add_argument(
-        "--workers",
-        type=int,
-        default=None,
-        help="Number of parallel workers for dataset generation (default: all CPU cores - 1)",
-    )
-    args = parser.parse_args()
+from typing import Optional
 
-    data_path = pathlib.Path(args.data)
-    if not data_path.is_file():
-        sys.exit(f"Data file not found: {data_path}")
 
-    # Initialise the DataLoader with the requested history length.
-    loader = DataLoader(
-        path=str(data_path),
-        history_length=args.history_length,
-        required_auftraege_per_patient=args.required_auftraege_per_patient,
-    )
+def _run_training(loader: Optional[DataLoader], args: argparse.Namespace) -> None:
+    """Execute the full training pipeline.
 
+    This function consolidates the dataset preparation, model training,
+    evaluation and persistence steps that were previously located in ``main``.
+    Keeping this logic in a dedicated function makes the script easier to
+    test and reuse programmatically.
+    """
     # ---------------------------------------------------------------------
     # Dataset generation (with progress reporting)
     # ---------------------------------------------------------------------
@@ -181,6 +140,11 @@ def main() -> None:
         loaded = np.load(test_dataset_path)
         X, y = loaded["X"], loaded["y"]
     else:
+        # If no cached dataset exists we must generate it. Ensure we have a DataLoader.
+        if loader is None:
+            raise RuntimeError(
+                "DataLoader is required to generate a new dataset but none was provided."
+            )
         print("Generating dataset …")
         X, y = _generate_dataset(loader, n_samples=args.samples, swap_ratio=0.5)
         # Save for fast subsequent runs
@@ -221,6 +185,68 @@ def main() -> None:
     model_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(pipeline, model_path)
     print(f"Model saved to {model_path}")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Train swap detection model")
+    parser.add_argument(
+        "--data",
+        type=str,
+        default="../data/preprocessed_auftrag.csv",
+        help="Path to the pre‑processed CSV file",
+    )
+    parser.add_argument(
+        "--samples",
+        type=int,
+        default=5000,
+        help="Number of training samples to generate",
+    )
+    parser.add_argument(
+        "--history-length",
+        type=int,
+        default=5,
+        help="History length used by DataLoader",
+    )
+    parser.add_argument(
+        "--test-dataset-path",
+        type=str,
+        default="../data/test_dataset.npz",
+        help="Path where the generated test dataset is cached",
+    )
+    parser.add_argument(
+        "--required-auftraege-per-patient",
+        type=int,
+        default=5,
+        help="Minimum number of distinct orders a patient must have to be included",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help="Number of parallel workers for dataset generation (default: all CPU cores - 1)",
+    )
+    args = parser.parse_args()
+
+    data_path = pathlib.Path(args.data)
+    test_dataset_path = pathlib.Path(args.test_dataset_path)
+
+    if test_dataset_path.is_file():
+        print(
+            "Cached dataset detected; skipping CSV load. "
+            "If you need to regenerate the dataset, delete the test dataset file."
+        )
+        loader: Optional[DataLoader] = None
+    else:
+        if not data_path.is_file():
+            sys.exit(f"Data file not found: {data_path}")
+        loader = DataLoader(
+            path=str(data_path),
+            history_length=args.history_length,
+            required_auftraege_per_patient=args.required_auftraege_per_patient,
+        )
+
+    # Delegate the remaining workflow to the dedicated helper.
+    _run_training(loader, args)
 
 
 if __name__ == "__main__":
