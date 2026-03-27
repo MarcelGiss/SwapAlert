@@ -45,8 +45,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-# Local imports
-from data_loader import DataLoader
 
 def _flatten_sample(df: pd.DataFrame) -> np.ndarray:
     """Flatten a ``DataLoader`` sample to a 1‑D ``numpy`` array.
@@ -63,7 +61,7 @@ def _flatten_sample(df: pd.DataFrame) -> np.ndarray:
 from typing import Optional
 
 
-def _run_training(loader: Optional[DataLoader], args: argparse.Namespace) -> None:
+def _run_training(args: argparse.Namespace) -> None:
     """Execute the full training pipeline.
 
     This function consolidates the dataset preparation, model training,
@@ -74,12 +72,12 @@ def _run_training(loader: Optional[DataLoader], args: argparse.Namespace) -> Non
     # ---------------------------------------------------------------------
     # Dataset generation (with progress reporting)
     # ---------------------------------------------------------------------
-    test_dataset_path = pathlib.Path(args.test_dataset_path)
-    if test_dataset_path.is_file():
-        print(f"Loading previously generated test dataset from {test_dataset_path}")
+    train_dataset_path = pathlib.Path(args.train_dataset_path)
+    if train_dataset_path.is_file():
+        print(f"Loading previously generated test dataset from {train_dataset_path}")
         import pandas as pd
 
-        df = pd.read_csv(test_dataset_path)
+        df = pd.read_csv(train_dataset_path)
         if "label" not in df.columns:
             raise ValueError("CSV dataset must contain a 'label' column")
         y = df["label"].values
@@ -89,8 +87,8 @@ def _run_training(loader: Optional[DataLoader], args: argparse.Namespace) -> Non
 
     # Split into train / test.
     # Determine a safe test split size.  For very small synthetic datasets the
-    # default 20 % split can result in a test set with fewer than two classes,
-    # causing ``train_test_split`` to raise a ValueError.  We fallback to a 50 %
+    # default 20% split can result in a test set with fewer than two classes,
+    # causing ``train_test_split`` to raise a ValueError.  We fallback to a 50%
     # split when the total number of samples is less than 5.
     split_ratio = 0.2 if X.shape[0] >= 5 else 0.5
     X_train, X_test, y_train, y_test = train_test_split(
@@ -131,15 +129,9 @@ def _run_training(loader: Optional[DataLoader], args: argparse.Namespace) -> Non
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train swap detection model")
     parser.add_argument(
-        "--data",
-        type=str,
-        default="../data/preprocessed_auftrag.csv",
-        help="Path to the pre‑processed CSV file",
-    )
-    parser.add_argument(
         "--train-dataset-path",
         type=str,
-        default="../data/train_dataset_len50k_h20_min5.csv",
+        default="../data/train_dataset_samp100k_hist20_min5_50swap.csv",
         help="Path where the generated test dataset is cached (CSV format)",
     )
     parser.add_argument(
@@ -150,23 +142,8 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    data_path = pathlib.Path(args.data)
-    train_dataset_path = pathlib.Path(args.train_dataset_path)
-
-    if train_dataset_path.is_file():
-        print(
-            "Cached dataset detected; skipping CSV load. "
-            "If you need to regenerate the dataset, delete the test dataset file."
-        )
-        loader: Optional[DataLoader] = None
-    else:
-        if not data_path.is_file():
-            sys.exit(f"Data file not found: {data_path}")
-    # Use default DataLoader parameters for history length and required orders per patient.
-    loader = DataLoader(path=str(data_path))
-
     # Delegate the remaining workflow to the dedicated helper.
-    _run_training(loader, args)
+    _run_training(args)
 
 
 if __name__ == "__main__":

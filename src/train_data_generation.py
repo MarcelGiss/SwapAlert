@@ -93,6 +93,27 @@ def generate_dataset(
         "Generating %d samples (swap_ratio=%.2f)", n_samples, swap_ratio
     )
 
+    # Ensure we do not generate more samples than there are distinct patients.
+    # The DataLoader stores a list of unique patient IDs in ``_patient_ids``.
+    # If the requested ``n_samples`` exceeds this count we cap it to the number
+    # of patients and log the adjustment. This guarantees that each generated
+    # sample can correspond to a unique patient when possible.
+    try:
+        patient_count = len(loader._patient_ids)
+    except Exception:
+        # Fallback: if the attribute is unavailable, proceed without capping.
+        patient_count = None
+
+    if patient_count is not None and n_samples > patient_count:
+        logger.info(
+            "Requested %d samples exceeds number of unique patients (%d); "
+            "capping to %d.",
+            n_samples,
+            patient_count,
+            patient_count,
+        )
+        n_samples = patient_count
+
     n_swap = int(n_samples * swap_ratio)
     n_clean = n_samples - n_swap
 
@@ -120,10 +141,18 @@ def generate_dataset(
     if save_path is not None:
         # Ensure parent directory exists.
         save_path.parent.mkdir(parents=True, exist_ok=True)
-        # Save as CSV with a ``label`` column for compatibility with training script.
+        # Build column names in the format ``{ANALYTID}_{POSITION_IN_HISTORY}``.
+        # ``loader.all_analyte`` holds the analyte identifiers in the order used
+        # when flattening each sample. ``loader.history_length`` is the number of
+        # historical columns per sample.
+        col_names = [
+            f"{analyt}_{pos}"
+            for analyt in loader.all_analyte
+            for pos in range(loader.history_length)
+        ]
         import pandas as pd
 
-        df = pd.DataFrame(X_arr)
+        df = pd.DataFrame(X_arr, columns=col_names)
         df["label"] = y_arr
         df.to_csv(save_path, index=False)
         logger.info("Dataset saved to %s", save_path)
@@ -169,7 +198,7 @@ def _parse_args() -> argparse.Namespace:
         "--output",
         type=str,
         required=False,
-        default="../data/train_dataset_samp100_hist20_min5.csv",
+        default="../data/train_dataset_samp100k_hist20_min5_50swap.csv",
         help="File path where the generated dataset will be saved (CSV format)",
     )
     return parser.parse_args()

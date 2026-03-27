@@ -7,7 +7,7 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.width', 1000)
 
 
-class DataLoader:
+class GenerationDataLoader:
     def __init__(self, path: str, history_length: int = 20, n_rows: int | None = None, required_auftraege_per_patient=5):
         """Create a DataLoader.
 
