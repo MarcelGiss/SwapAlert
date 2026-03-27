@@ -172,13 +172,36 @@ def _run_training(args: argparse.Namespace) -> None:
 
     print("Evaluating on test set …")
     y_pred = pipeline.predict(X_test)
-    print(classification_report(y_test, y_pred, target_names=["no_swap", "swap"]))
+    report = classification_report(y_test, y_pred, target_names=["no_swap", "swap"])
+    print(report)
 
-    # Persist the pipeline.
-    model_path = pathlib.Path("models/swap_detector.pkl")
-    model_path.parent.mkdir(parents=True, exist_ok=True)
+    # ---------------------------------------------------------------------
+    # Determine next model version based on existing files in the models dir.
+    # Files follow the pattern ``swap_detector_<N>.pkl`` where <N> is an integer.
+    # ---------------------------------------------------------------------
+    models_dir = pathlib.Path("models")
+    models_dir.mkdir(parents=True, exist_ok=True)
+    existing = sorted(models_dir.glob("swap_detector_*.pkl"))
+    if existing:
+        # Extract numeric suffixes and compute the next version.
+        versions = [int(p.stem.split("_")[-1]) for p in existing if p.stem.split("_")[-1].isdigit()]
+        next_version = max(versions) + 1 if versions else 1
+    else:
+        next_version = 1
+
+    model_path = models_dir / f"swap_detector_{next_version}.pkl"
     joblib.dump(pipeline, model_path)
     print(f"Model saved to {model_path}")
+
+    # ---------------------------------------------------------------------
+    # Persist the evaluation report in the ``trains`` directory using a
+    # naming scheme that mirrors existing files, e.g. ``random_forest_2.txt``.
+    # ---------------------------------------------------------------------
+    trains_dir = pathlib.Path("trains")
+    trains_dir.mkdir(parents=True, exist_ok=True)
+    report_path = trains_dir / f"{args.model_type}_{next_version}.txt"
+    report_path.write_text(report)
+    print(f"Evaluation report saved to {report_path}")
 
 
 def main() -> None:
@@ -192,7 +215,7 @@ def main() -> None:
     parser.add_argument(
         "--model-type",
         type=str,
-        default="hist_gradient_boosting",
+        default="svm",
         choices=[
             "random_forest",
             "gradient_boosting",
