@@ -120,14 +120,18 @@ def _run_training(args: argparse.Namespace) -> None:
             verbose=args.verbose,
         )
     elif args.model_type == "hist_gradient_boosting":
-        # Using HistGradientBoostingClassifier for faster training and early stopping support
+        # Using HistGradientBoostingClassifier with tuned hyper‑parameters for
+        # better precision/recall balance. The previous configuration used a
+        # very low learning rate and no regularisation, which limited the model
+        # from fully exploiting the data. We increase the learning rate, limit
+        # tree depth to reduce over‑fitting, and add L2 regularisation.
         from sklearn.ensemble import HistGradientBoostingClassifier
         clf = HistGradientBoostingClassifier(
-            max_iter=500,
-            learning_rate=0.05,
-            max_depth=None,
+            max_iter=800,                # allow more boosting rounds
+            learning_rate=0.1,           # higher LR for faster convergence
+            max_depth=5,                 # shallow trees to improve generalisation
             early_stopping=True,
-            l2_regularization=0.0,
+            l2_regularization=0.1,      # mild regularisation to curb over‑fit
             random_state=42,
             verbose=args.verbose,
         )
