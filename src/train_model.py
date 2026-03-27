@@ -98,7 +98,7 @@ def _run_training(args: argparse.Namespace) -> None:
     # Choose classifier based on requested model type.
     if args.model_type == "random_forest":
         clf = RandomForestClassifier(
-            n_estimators=500,
+            n_estimators=args.n_estimators,
             max_depth=20,
             min_samples_split=2,
             min_samples_leaf=1,
@@ -108,10 +108,23 @@ def _run_training(args: argparse.Namespace) -> None:
         )
     elif args.model_type == "gradient_boosting":
         clf = GradientBoostingClassifier(
-            n_estimators=500,
-            learning_rate=0.1,
+            n_estimators=args.n_estimators,
+            learning_rate=args.learning_rate,
             max_depth=5,
             random_state=42,
+            verbose=args.verbose,
+        )
+    elif args.model_type == "hist_gradient_boosting":
+        # Using HistGradientBoostingClassifier for faster training and early stopping support
+        from sklearn.ensemble import HistGradientBoostingClassifier
+
+        clf = HistGradientBoostingClassifier(
+            max_iter=args.n_estimators,
+            learning_rate=args.learning_rate,
+            max_depth=None,
+            early_stopping=True,
+            random_state=42,
+            verbose=args.verbose,
         )
     else:
         raise ValueError(f"Unsupported model type: {args.model_type}")
@@ -150,9 +163,26 @@ def main() -> None:
     parser.add_argument(
         "--model-type",
         type=str,
-        default="gradient_boosting",
-        choices=["random_forest", "gradient_boosting"],
-        help="Select which supervised model to train (default: random_forest)",
+        default="hist_gradient_boosting",
+        choices=["random_forest", "gradient_boosting", "hist_gradient_boosting"],
+        help="Select which supervised model to train (default: gradient_boosting)",
+    )
+    parser.add_argument(
+        "--n-estimators",
+        type=int,
+        default=200,
+        help="Number of boosting/forest estimators (default: 200 for gradient boosting, 500 for random forest).",
+    )
+    parser.add_argument(
+        "--learning-rate",
+        type=float,
+        default=0.1,
+        help="Learning rate for gradient boosting models (default: 0.1).",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable verbose output during model training (shows progress for gradient boosting).",
     )
     parser.add_argument(
         "--workers",
