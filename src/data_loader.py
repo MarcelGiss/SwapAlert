@@ -1,6 +1,11 @@
 import pandas as pd
 import numpy as np
 
+# Configure pandas to display the full DataFrame when printed.
+pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
+pd.set_option('display.width', 1000)
+
 
 class DataLoader:
     def __init__(self, path: str, history_length: int = 20, n_rows: int | None = None, required_auftraege_per_patient=5):
@@ -29,8 +34,10 @@ class DataLoader:
             )
             valid_patients = patient_auftrag_counts[patient_auftrag_counts >= required_auftraege_per_patient].index
             self.data = self.data[self.data["patientid"].isin(valid_patients)]
-        # Determine the set of all analytes after filtering patients.
-        self.all_analyte = self.data["analyt"].unique()
+        # Determine the set of all analytes, sorted by overall frequency in the dataset.
+        # ``value_counts`` returns a Series indexed by the analyte name, sorted descending.
+        # Using the index preserves this order for later reindexing of pivot tables.
+        self.all_analyte = self.data["analyt"].value_counts().index.to_numpy()
         self.history_length = history_length
 
     def get_sample(self, add_synthetic_swap: bool = False):
@@ -125,7 +132,7 @@ if __name__ == "__main__":
     # Load the sample CSV provided in the repository and retrieve a sample
     # without and with synthetic swap to verify basic functionality.
     csv_path = "./data/preprocessed_auftrag.csv"
-    loader = DataLoader(csv_path)
+    loader = DataLoader(csv_path, n_rows = 10000, required_auftraege_per_patient=3, history_length=3)
     print("--- Sample without synthetic swap ---")
     sample = loader.get_sample()
     print(sample)
